@@ -53,7 +53,7 @@ struct Vec3
     Vec3<t> &normlize(t l = 1)
     {
         *this = (*this) * (1 / norm());
-        return this;
+        return *this;
     }
     template <class>
     friend std::ostream &operator<<(std::ostream &s, Vec3<t> &v);
