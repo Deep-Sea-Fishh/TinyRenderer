@@ -182,3 +182,102 @@ void line(int x0, int y0, int x1, int y1, TGAImage &image, TGAColor color)
 
 ### 画三角形
 
+实现绘制三角形的功能。
+
+##### 方法1：扫线
+
+对一个三角形，我们可以细分为很多条线，依次画线即可将三角形填满。
+
+我们可以将三个顶点按y坐标排序，从底向上画每一条线。
+
+```cpp
+void triangle(Vec2i *t, TGAImage &image, TGAColor color)
+{
+  std::sort(t, t + 2, [](Vec2i u, Vec2i v)
+            { return u.y < v.y; });
+  int totalHeight = t[2].y - t[0].y;
+  for (int y = t[0].y; y < t[1].y; y++)
+  {
+      int segmentHeight = t[1].y - t[0].y;
+      float alpha = (float)(y - t[0].y) / totalHeight;
+      float beta = (float)(y - t[0].y) / segmentHeight;
+      Vec2i A = t[0] + (t[2] - t[0]) * alpha;
+      Vec2i B = t[0] + (t[1] - t[0]) * beta;
+      line(A.x, y, B.x, y, image, color);
+  }
+}
+```
+
+
+
+##### 方法2：重心坐标
+
+在重心坐标下，一个点P如果在三角形内部，则有P=uA+vB+wC，其中，$0\le u,v,w\le 1$且$u+v+w==1$。
+
+先找出三角形的包围盒，遍历包围盒中的每一个点，判断该点是否在三角形内部，如果在，则绘制该像素点。
+
+设$P=A+u\vec{AB}+v\vec{AC},即u\vec{AB}+v\vec{AC}+\vec{PA}==0$。
+
+有下面两个式子：
+
+$uAB_x+vAC_x+PA_x==0$
+
+$uAB_y+vAC_y+PA_y==0$
+
+写成矩阵的形式：
+$$
+\left[
+\begin{matrix}
+u & v & 1
+\end{matrix}
+\right]
+·
+\left[
+\begin{matrix}
+AB_x \\
+AC_x \\
+PA_x
+\end{matrix}
+\right]
+=0
+$$
+
+$$
+\left[
+\begin{matrix}
+u & v & 1
+\end{matrix}
+\right]
+·
+\left[
+\begin{matrix}
+AB_y \\
+AC_y \\
+PA_y
+\end{matrix}
+\right]
+=0
+$$
+
+即找出一个与$[AB_x,AC_x,PA_x]$和$[AB_y,AC_y,PA_y]$同时垂直的向量，求叉积即可。
+
+则最终有$P=(1-u-v)A+vB+uC$
+
+```
+Vec3f barycentric(int x, int y, Vec2i *t)
+{
+    Vec2i p(x, y);
+    Vec2i AB = t[1] - t[0], AC = t[2] - t[0], PA = t[0] - p;
+    Vec3f u(AB.x, AC.x, PA.x), v(AB.y, AC.y, PA.y);
+    Vec3f uv = u ^ v;
+    if (uv.z < 0)
+        return {1, 1, -1};
+    return Vec3f(1. - (uv.x + uv.y) / uv.z, uv.y / uv.z, uv.x / uv.z);
+}
+```
+
+
+
+##### 计算光照
+
+对于每个三角形，计算出法线并标准化，使用法线和光照的点乘作为光照强度。

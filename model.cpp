@@ -24,7 +24,7 @@ Model::Model(const char *fileName)
             iss >> trash;
             Vec3f v;
             for (int i = 0; i < 3; i++)
-                iss >> v.raw[i];
+                iss >> v[i];
             verts.push_back(v);
         }
         else if (!line.compare(0, 2, "f ")) // 面

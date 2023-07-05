@@ -8,9 +8,13 @@ const int width = 800;
 const int height = 800;
 const TGAColor white(255, 255, 255, 255);
 const TGAColor red(255, 0, 0, 255);
-Vec2i t[3] = {{100, 100}, {500, 300}, {300, 500}};
 Model *model;
 Vec3f light_dir(0, 0, -1);
+float *zbuffer;
+int getIndex(int x, int y)
+{
+    return width * y + x;
+}
 void line(int x0, int y0, int x1, int y1, TGAImage &image, TGAColor color)
 {
     bool steep = false;
@@ -60,72 +64,84 @@ void line(int x0, int y0, int x1, int y1, TGAImage &image, TGAColor color)
 //      }
 //  }
 
-Vec3f barycentric(int x, int y, Vec2i *t)
+Vec3f barycentric(Vec3f A, Vec3f B, Vec3f C, Vec3f P)
 {
-    Vec2i p(x, y);
-    Vec2i AB = t[1] - t[0], AC = t[2] - t[0], PA = t[0] - p;
-    Vec3f u(AB.x, AC.x, PA.x), v(AB.y, AC.y, PA.y);
-    Vec3f uv = u ^ v;
-    if (uv.z < 0)
-        return {1, 1, -1};
-    return Vec3f(1. - (uv.x + uv.y) / uv.z, uv.y / uv.z, uv.x / uv.z);
-}
-bool inside(int x, int y, Vec2i *t)
-{
-    Vec3f tuple = barycentric(x, y, t);
-    if (tuple.x < 0 || tuple.y < 0 || tuple.z < 0)
-        return false;
-    return true;
+    Vec3f AB = B - A, AC = C - A, PA = A - P;
+    Vec3f u = Vec3f(AB.x, AC.x, PA.x), v = Vec3f(AB.y, AC.y, PA.y);
+    Vec3f UV = cross(u, v);
+    if (std::fabs(UV.z) > 1e-2)
+        return Vec3f((1.f - (UV.x + UV.y) / UV.z), UV.y / UV.z, UV.x / UV.z);
+    return Vec3f(1, 1, -1);
 }
 
 // 重心坐标
-void triangle(Vec2i *t, TGAImage &image, TGAColor color)
+void triangle(Vec3f *pts, float *zbuffer, TGAImage &image, TGAColor color)
 {
-    // 找包围框
-    int min_x = width, max_x = 0, min_y = height, max_y = 0;
+    // 包围盒
+    Vec2f bbomin(std::numeric_limits<float>::max(), std::numeric_limits<float>::max());
+    Vec2f bbomax(-std::numeric_limits<float>::max(), -std::numeric_limits<float>::max());
+    Vec2f clamp(image.get_width() - 1, image.get_height() - 1);
     for (int i = 0; i < 3; i++)
     {
-        min_x = std::min(min_x, t[i].x);
-        max_x = std::max(max_x, t[i].x);
-        min_y = std::min(min_y, t[i].y);
-        max_y = std::max(max_y, t[i].y);
-    }
-    for (int x = min_x; x <= max_x; x++)
-    {
-        for (int y = min_y; y <= max_y; y++)
+        for (int j = 0; j < 2; j++)
         {
-            if (inside(x, y, t))
+            bbomin[j] = std::max(0.f, std::min(bbomin[j], pts[i][j]));
+            bbomax[j] = std::min(clamp[j], std::max(bbomax[j], pts[i][j]));
+        }
+    }
+    Vec3f P;
+    for (P.x = bbomin.x; P.x <= bbomax.x; P.x++)
+    {
+        for (P.y = bbomin.y; P.y <= bbomax.y; P.y++)
+        {
+            Vec3f bc_screen = barycentric(pts[0], pts[1], pts[2], P);
+            if (bc_screen.x < 0 || bc_screen.y < 0 || bc_screen.z < 0)
+                continue;
+            P.z = 0;
+            for (int i = 0; i < 3; i++)
+                P.z += pts[i].z * bc_screen[i];
+            if (zbuffer[getIndex(P.x, P.y)] < P.z)
             {
-                image.set(x, y, color);
+                zbuffer[getIndex(P.x, P.y)] = P.z;
+                image.set(P.x, P.y, color);
             }
         }
     }
 }
 
+Vec3f world2screen(Vec3f v)
+{
+    return Vec3f(int((v.x + 1.) * width / 2. + .5), int((v.y + 1.) * height / 2. + .5), v.z);
+}
+
 int main(int argc, char **argv)
 {
     srand(time(0));
-    TGAImage image(width, height, TGAImage::RGB);
+    TGAImage render(width, height, TGAImage::RGB);
+    zbuffer = new float[width * height];
+    for (int i = 0; i < width * height; i++)
+        zbuffer[i] = -std::numeric_limits<float>::max();
     model = new Model("obj\\african_head\\african_head.obj");
     for (int i = 0; i < model->nfaces(); i++)
     {
         std::vector<int> f = model->face(i);
-        Vec2i screenCoords[3];
-        Vec3f worldCoords[3];
+        Vec3f pts[3], worldCoords[3];
         for (int j = 0; j < 3; j++)
         {
-            screenCoords[j] = Vec2i((model->vert(f[j]).x + 1.) * width / 2., (model->vert(f[j]).y + 1.) * height / 2.);
             worldCoords[j] = model->vert(f[j]);
+            pts[j] = world2screen(model->vert(f[j]));
         }
+
         // 计算法线
-        Vec3f n = (worldCoords[2] - worldCoords[0]) ^ (worldCoords[1] - worldCoords[0]);
-        // 计算光照
-        n.normlize();
-        float intensity = light_dir * n;
-        triangle(screenCoords, image, TGAColor(255 * intensity, 255 * intensity, 255 * intensity, 255));
+        Vec3f n = cross(worldCoords[2] - worldCoords[0], worldCoords[1] - worldCoords[0]);
+        n.normalize();
+        float intensity = n * light_dir;
+        std::cerr << n << std::endl;
+        if (intensity > 0)
+            triangle(pts, zbuffer, render, TGAColor(255 * intensity, 255 * intensity, 255 * intensity, 255));
     }
-    image.flip_vertically();
-    image.write_tga_file("test.tga");
+    render.flip_vertically();
+    render.write_tga_file("test.tga");
     delete model;
     return 0;
 }
