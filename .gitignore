@@ -1,4 +1,5 @@
 build/
 framebuffer.tga
 
+*.exe
 .vscode
