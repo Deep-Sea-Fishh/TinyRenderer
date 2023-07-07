@@ -261,7 +261,7 @@ $$
 
 即找出一个与$[AB_x,AC_x,PA_x]$和$[AB_y,AC_y,PA_y]$同时垂直的向量，求叉积即可。
 
-则最终有$P=(1-u-v)A+vB+uC$
+则最终有$P=(1-u-v)A+uB+vC$
 
 ```
 Vec3f barycentric(int x, int y, Vec2i *t)
@@ -272,7 +272,7 @@ Vec3f barycentric(int x, int y, Vec2i *t)
     Vec3f uv = u ^ v;
     if (uv.z < 0)
         return {1, 1, -1};
-    return Vec3f(1. - (uv.x + uv.y) / uv.z, uv.y / uv.z, uv.x / uv.z);
+    return Vec3f(1. - (uv.x + uv.y) / uv.z, uv.x / uv.z, uv.y / uv.z);
 }
 ```
 

@@ -78,14 +78,14 @@ int Model::nfaces()
     return faces.size();
 }
 
-Vec3f Model::vert(int idx)
+Vec3f Model::vert(int iface, int nthvert)
 {
-    return verts[idx];
+    return verts[faces[iface][nthvert].x];
 }
 
-Vec3f Model::normal(int idx)
+Vec3f Model::normal(int iface, int nthvert)
 {
-    return normals[idx];
+    return normals[faces[iface][nthvert].z];
 }
 
 std::vector<Vec3i> Model::face(int idx)
@@ -93,7 +93,7 @@ std::vector<Vec3i> Model::face(int idx)
     return faces[idx];
 }
 
-Vec2f Model::texture(int idx)
+Vec2f Model::texture(int iface, int nthvert)
 {
-    return textures[idx];
+    return textures[faces[iface][nthvert].y];
 }

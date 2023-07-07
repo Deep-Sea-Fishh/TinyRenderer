@@ -16,10 +16,10 @@ public:
     ~Model();
     int nverts();
     int nfaces();
-    Vec3f vert(int idx);
-    Vec3f normal(int idx);
+    Vec3f vert(int iface, int nthvert);
+    Vec3f normal(int iface, int nthvert);
     std::vector<Vec3i> face(int idx);
-    Vec2f texture(int idx);
+    Vec2f texture(int iface, int nthvert);
 };
 
 #endif
