@@ -102,11 +102,12 @@ void triangle(Vec4f *pts, IShader &shader, TGAImage &image, float *zbuffer)
         }
     }
     Vec3f P;
-    TGAColor color;
+    TGAColor color(0, 0, 0, 255);
     for (P.x = int(bbomin.x); P.x <= int(bbomax.x + .5); P.x++)
     {
         for (P.y = int(bbomin.y); P.y <= int(bbomax.y + .5); P.y++)
         {
+            color = {0, 0, 0, 255};
             Vec3f bc_screen = barycentric(proj<2>(pts[0] / pts[0][3]), proj<2>(pts[1] / pts[1][3]), proj<2>(pts[2] / pts[2][3]), proj<2>(P));
             if (bc_screen.x < 0 || bc_screen.y < 0 || bc_screen.z < 0)
                 continue;
@@ -123,16 +124,6 @@ void triangle(Vec4f *pts, IShader &shader, TGAImage &image, float *zbuffer)
                     image.set(P.x, P.y, color);
                 }
             }
-            // if (zbuffer.get(P.x, P.y)[0] < P.z)
-            // {
-
-            //     bool discard = shader.fragment(bc_screen, color);
-            //     if (!discard)
-            //     {
-            //         zbuffer.get(P.x, P.y)[0] = P.z;
-            //         image.set(P.x, P.y, color);
-            //     }
-            // }
         }
     }
 }
