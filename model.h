@@ -7,15 +7,19 @@
 class Model
 {
 private:
-    std::vector<Vec3f> verts;            // 点集
-    std::vector<std::vector<int>> faces; // 面集
+    std::vector<Vec3f> verts;              // 点集
+    std::vector<Vec3f> normals;            // 法线集
+    std::vector<std::vector<Vec3i>> faces; // 面集
+    std::vector<Vec2f> textures;           // 材质
 public:
     Model(const char *fileName);
     ~Model();
     int nverts();
     int nfaces();
     Vec3f vert(int idx);
-    std::vector<int> face(int idx);
+    Vec3f normal(int idx);
+    std::vector<Vec3i> face(int idx);
+    Vec2f texture(int idx);
 };
 
 #endif

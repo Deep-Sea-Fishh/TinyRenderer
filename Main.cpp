@@ -3,6 +3,7 @@
 #include "tgaimage.h"
 #include "geometry.h"
 #include "model.h"
+#include "texture.h"
 
 const double PI = acos(-1);
 
@@ -11,6 +12,7 @@ const int height = 800;
 const TGAColor white(255, 255, 255, 255);
 const TGAColor red(255, 0, 0, 255);
 Model *model;
+Texture *texture;
 Vec3f light_dir(0, 0, -1);
 float *zbuffer;
 
@@ -96,21 +98,17 @@ Matrix getViewport()
     vp[1][3] = height / 2.f;
     return vp;
 }
-Vec3f world2screen(Vec3f v)
-{
-    return Vec3f(int((v.x + 1.) * width / 2. + .5), int((v.y + 1.) * height / 2. + .5), v.z);
-}
 Vec3f barycentric(Vec3f A, Vec3f B, Vec3f C, Vec3f P)
 {
     Vec3f AB = B - A, AC = C - A, PA = A - P;
     Vec3f u = Vec3f(AB.x, AC.x, PA.x), v = Vec3f(AB.y, AC.y, PA.y);
     Vec3f UV = u ^ v;
     if (std::fabs(UV.z) > 1e-2)
-        return Vec3f((1.f - (UV.x + UV.y) / UV.z), UV.y / UV.z, UV.x / UV.z);
+        return Vec3f((1.f - (UV.x + UV.y) / UV.z), UV.x / UV.z, UV.y / UV.z);
     return Vec3f(1, 1, -1);
 }
 
-void triangle(Vec3f *pts, float *zbuffer, TGAImage &image, TGAColor color)
+void triangle(Vec3f *pts, float *zbuffer, TGAImage &image, Vec3f *normals, TGAColor *textures)
 {
     // 包围盒
     Vec2f bbomin(std::numeric_limits<float>::max(), std::numeric_limits<float>::max());
@@ -126,9 +124,9 @@ void triangle(Vec3f *pts, float *zbuffer, TGAImage &image, TGAColor color)
         }
     }
     Vec3f P;
-    for (P.x = bbomin.x; P.x <= bbomax.x; P.x++)
+    for (P.x = int(bbomin.x); P.x <= int(bbomax.x + .5); P.x++)
     {
-        for (P.y = bbomin.y; P.y <= bbomax.y; P.y++)
+        for (P.y = int(bbomin.y); P.y <= int(bbomax.y + .5); P.y++)
         {
             Vec3f bc_screen = barycentric(pts[0], pts[1], pts[2], P);
             if (bc_screen.x < 0 || bc_screen.y < 0 || bc_screen.z < 0)
@@ -139,7 +137,20 @@ void triangle(Vec3f *pts, float *zbuffer, TGAImage &image, TGAColor color)
             if (zbuffer[getIndex(P.x, P.y)] < P.z)
             {
                 zbuffer[getIndex(P.x, P.y)] = P.z;
-                image.set(P.x, P.y, color);
+                // 计算法线
+                Vec3f normal = normals[0] * bc_screen[0] + normals[1] * bc_screen[1] + normals[2] * bc_screen[2];
+                // std::cout << normal;
+                //  计算光照
+                float intensity = -(normal * light_dir);
+                if (intensity <= 0)
+                    continue;
+                // 计算颜色
+                TGAColor color(0, 0, 0, 255);
+                color.bgra[0] = textures[0][0] * bc_screen[0] + textures[1][0] * bc_screen[1] + textures[2][0] * bc_screen[2];
+                color.bgra[1] = textures[0][1] * bc_screen[0] + textures[1][1] * bc_screen[1] + textures[2][1] * bc_screen[2];
+                color.bgra[2] = textures[0][2] * bc_screen[0] + textures[1][2] * bc_screen[1] + textures[2][2] * bc_screen[2];
+                color.bgra[3] = textures[0][3] * bc_screen[0] + textures[1][3] * bc_screen[1] + textures[2][3] * bc_screen[2];
+                image.set(P.x, P.y, color * intensity);
             }
         }
     }
@@ -153,30 +164,29 @@ int main(int argc, char **argv)
     for (int i = 0; i < width * height; i++)
         zbuffer[i] = -std::numeric_limits<float>::max();
     model = new Model("obj\\african_head\\african_head.obj");
+    texture = new Texture("obj\\african_head\\african_head_diffuse.tga");
     Matrix mod = getModel(Vec3f(1, 1, 1));
     Matrix view = getView(cameraPos, cameraDir, cameraUp);
     Matrix projection = getProjection(-0.05, -50, 30, 1);
     Matrix viewport = getViewport();
     for (int i = 0; i < model->nfaces(); i++)
     {
-        std::vector<int> f = model->face(i);
-        Vec3f pts[3], worldCoords[3];
+        std::vector<Vec3i> f = model->face(i);
+        Vec3f pts[3];
+        Vec3f normals[3];
+        TGAColor textures[3];
         for (int j = 0; j < 3; j++)
         {
-            worldCoords[j] = model->vert(f[j]);
-            // pts[j] = world2screen((model->vert(f[j])));
-            pts[j] = m2v(viewport * projection * view * mod * v2m(model->vert(f[j])));
+            pts[j] = m2v(viewport * projection * view * mod * v2m(model->vert(f[j].x)));
+            normals[j] = model->normal(f[j].z);
+            textures[j] = texture->uv(model->texture(f[j].y));
         }
 
-        // 计算法线
-        Vec3f n = (worldCoords[2] - worldCoords[0]) ^ (worldCoords[1] - worldCoords[0]);
-        n.normalize();
-        float intensity = n * light_dir;
-        if (intensity > 0)
-            triangle(pts, zbuffer, render, TGAColor(255 * intensity, 255 * intensity, 255 * intensity, 255));
+        triangle(pts, zbuffer, render, normals, textures);
     }
     render.flip_vertically();
     render.write_tga_file("test.tga");
     delete model;
+    delete texture;
     return 0;
 }

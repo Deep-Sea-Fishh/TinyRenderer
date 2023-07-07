@@ -27,20 +27,41 @@ Model::Model(const char *fileName)
                 iss >> v[i];
             verts.push_back(v);
         }
+        else if (!line.compare(0, 3, "vt ")) // 点
+        {
+            iss >> trash >> trash;
+            Vec2f v;
+            for (int i = 0; i < 2; i++)
+                iss >> v[i];
+            while (iss >> trash)
+                ;
+            textures.push_back(v);
+        }
+        else if (!line.compare(0, 3, "vn ")) // 点
+        {
+            iss >> trash >> trash;
+            Vec3f v;
+            for (int i = 0; i < 3; i++)
+                iss >> v[i];
+            normals.push_back(v);
+        }
         else if (!line.compare(0, 2, "f ")) // 面
         {
             iss >> trash;
-            int itrash, idx;
-            std::vector<int> f;
-            while (iss >> idx >> trash >> itrash >> trash >> itrash)
+            int itrash;
+            std::vector<Vec3i> f;
+            Vec3i idx;
+            while (iss >> idx.x >> trash >> idx.y >> trash >> idx.z)
             {
-                idx--;
+                idx.x--;
+                idx.y--;
+                idx.z--;
                 f.push_back(idx);
             }
             faces.push_back(f);
         }
     }
-    std::cerr << "# v# " << verts.size() << " f# " << faces.size() << std::endl;
+    std::cerr << "# v# " << verts.size() << "# vt# " << textures.size() << "# vn# " << normals.size() << " f# " << faces.size() << std::endl;
 }
 
 Model::~Model()
@@ -62,7 +83,17 @@ Vec3f Model::vert(int idx)
     return verts[idx];
 }
 
-std::vector<int> Model::face(int idx)
+Vec3f Model::normal(int idx)
+{
+    return normals[idx];
+}
+
+std::vector<Vec3i> Model::face(int idx)
 {
     return faces[idx];
+}
+
+Vec2f Model::texture(int idx)
+{
+    return textures[idx];
 }
