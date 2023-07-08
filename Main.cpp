@@ -5,7 +5,7 @@
 #include "geometry.h"
 #include "model.h"
 #include "texture.h"
-#include "myGL.h"
+#include "render.h"
 
 const int width = 800;
 const int height = 800;
@@ -13,13 +13,13 @@ const int height = 800;
 Model *model;
 Texture *diffuse;
 Texture *spec;
-Vec3f light_dir(0, 0, -1);
+Vec3f light_dir(0, 0, -2);
 
 Matrix ModelView;
 Matrix Viewport;
 Matrix Projection;
 
-const Vec3f cameraPos(0, 0, 3);
+const Vec3f cameraPos(0.5, 0, 2);
 const Vec3f cameraCenter(0, 0, 0);
 const Vec3f cameraUp(0, 1, 0);
 
@@ -54,7 +54,7 @@ struct GouraudShader : public IShader
         return false; // no, we do not discard this pixel
     }
 };
-
+int cnt = 0;
 struct PhoneShader : public IShader
 {
     Vec3f varying_normal[3];
@@ -72,6 +72,7 @@ struct PhoneShader : public IShader
 
     virtual bool fragment(Vec3f bar, TGAColor &color)
     {
+        cnt++;
         // 定义环境光,漫反射系数,镜面反射系数
         float ka = 0.1, kd = 0.9, ks = 0.3, p = 60;
         TGAColor amb = {128, 128, 128, 255};
@@ -102,11 +103,6 @@ struct PhoneShader : public IShader
 
 int main(int argc, char **argv)
 {
-    TGAImage image(width, height, TGAImage::RGB);
-    float *zbuffer = new float[width * height];
-    for (int i = 0; i < width * height; i++)
-        zbuffer[i] = -std::numeric_limits<float>::max();
-
     std::vector<Model *> models;
     std::vector<Texture *> diffuses;
     std::vector<Texture *> specs;
@@ -134,11 +130,12 @@ int main(int argc, char **argv)
         specs.push_back(spec);
     }
 
-    ModelView = getView(cameraPos, cameraCenter, cameraUp);
-    Projection = getProjection(-1, -35, 30, 1);
-    Viewport = getViewport(width, height);
+    ModelView = Render::getView(cameraPos, cameraCenter, cameraUp);
+    Projection = Render::getProjection(-0.05, -50, 30, 1);
+    Viewport = Render::getViewport(width, height);
 
     PhoneShader shader;
+    Render *render = new Render(width, height, &shader, MSAA::ONE_ONE);
     for (int t = 0; t < std::max(1, argc - 1); t++)
     {
         model = models[t];
@@ -155,12 +152,14 @@ int main(int argc, char **argv)
                 normals[j] = model->normal(i, j);
                 difs[j] = diffuse->uv(model->texture(i, j));
             }
-            triangle(pts, shader, image, zbuffer);
+            render->triangle(pts);
         }
     }
-
-    image.flip_vertically();
-    image.write_tga_file("test.tga");
+    std::cout << cnt << std::endl;
+    render->getImage()->flip_vertically();
+    render->getImage()->write_tga_file("boggie_1X1.tga");
+    render->getSuperImage()->flip_vertically();
+    render->getSuperImage()->write_tga_file("boggie_1X1s.tga");
     while (models.size())
     {
         delete models.back();

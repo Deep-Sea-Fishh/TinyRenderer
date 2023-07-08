@@ -73,7 +73,7 @@ struct TGAColor
     {
         TGAColor res = *this;
         for (int i = 0; i < 3; i++)
-            res.bgra[i] = std::min(255, bgra[i] + color.bgra[i]);
+            res.bgra[i] = std::min(255, (int)bgra[i] + color.bgra[i]);
         return res;
     }
 };
