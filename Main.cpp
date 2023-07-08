@@ -29,7 +29,7 @@ struct GouraudShader : public IShader
     virtual Vec4f vertex(int iface, int nthvert)
     {
         // 定义环境光,漫反射系数,镜面反射系数
-        float ka = 0.1, kd = 0.6, ks = 0.5;
+        float ka = 0.1, kd = 0.6, ks = 0.5, p = 60;
         TGAColor amb = {128, 128, 128, 255};
 
         Vec4f gl_Vertex = embed<4>(model->vert(iface, nthvert));                       // read the vertex from .obj file
@@ -42,7 +42,7 @@ struct GouraudShader : public IShader
         h.normalize();
         // 计算n·h
         float ksIntensity = std::max(0.f, -(model->normal(iface, nthvert) * h));
-        varying_color[nthvert] = amb * ka + diffuse->uv(model->texture(iface, nthvert)) * intensity * kd + spec->uv(model->texture(iface, nthvert)) * ksIntensity * ks;
+        varying_color[nthvert] = amb * ka + diffuse->uv(model->texture(iface, nthvert)) * intensity * kd + spec->uv(model->texture(iface, nthvert)) * std::pow(ksIntensity, p) * ks;
         return gl_Vertex;
     }
 
@@ -73,7 +73,7 @@ struct PhoneShader : public IShader
     virtual bool fragment(Vec3f bar, TGAColor &color)
     {
         // 定义环境光,漫反射系数,镜面反射系数
-        float ka = 0.1, kd = 0.9, ks = 0.3;
+        float ka = 0.1, kd = 0.9, ks = 0.3, p = 60;
         TGAColor amb = {128, 128, 128, 255};
 
         Vec3f vtx;
@@ -95,7 +95,7 @@ struct PhoneShader : public IShader
         // 计算n·h
         float ksIntensity = std::max(0.f, -(normal * h));
 
-        color = amb * ka + diffuse->uv(tex) * intensity * kd + spec->uv(tex) * ksIntensity * ks;
+        color = amb * ka + diffuse->uv(tex) * intensity * kd + spec->uv(tex) * std::pow(ksIntensity, p) * ks;
         return false; // no, we do not discard this pixel
     }
 };
