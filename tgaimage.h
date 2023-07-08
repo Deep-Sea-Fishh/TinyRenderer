@@ -69,6 +69,13 @@ struct TGAColor
             res.bgra[i] = bgra[i] * intensity;
         return res;
     }
+    TGAColor operator+(TGAColor color) const
+    {
+        TGAColor res = *this;
+        for (int i = 0; i < 3; i++)
+            res.bgra[i] = std::min(255, bgra[i] + color.bgra[i]);
+        return res;
+    }
 };
 
 class TGAImage
