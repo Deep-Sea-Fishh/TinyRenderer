@@ -4,19 +4,15 @@
 #include "tgaimage.h"
 #include <algorithm>
 
+Matrix ModelView;
+Matrix Viewport;
+Matrix Projection;
+
 IShader::~IShader()
 {
 }
 
-Matrix Render::getModel(Vec3f scale)
-{
-    Matrix S = Matrix::identity();
-    S[0][0] = scale[0];
-    S[1][1] = scale[1];
-    S[2][2] = scale[2];
-    return S;
-}
-Matrix Render::getView(Vec3f pos, Vec3f center, Vec3f up)
+void getView(Vec3f pos, Vec3f center, Vec3f up)
 {
     Matrix viewT = Matrix::identity();
     viewT[0][3] = -pos.x;
@@ -26,6 +22,7 @@ Matrix Render::getView(Vec3f pos, Vec3f center, Vec3f up)
     Vec3f dir = center - pos;
     dir.normalize();
     Vec3f t = cross(dir, up);
+    up = cross(t, dir);
     viewR[0][0] = t.x;
     viewR[0][1] = t.y;
     viewR[0][2] = t.z;
@@ -37,9 +34,10 @@ Matrix Render::getView(Vec3f pos, Vec3f center, Vec3f up)
     viewR[2][0] = -dir.x;
     viewR[2][1] = -dir.y;
     viewR[2][2] = -dir.z;
-    return viewR * viewT;
+    ModelView = viewR * viewT;
 }
-Matrix Render::getProjection(float near, float far, float fov, float aspect)
+
+void getProjection(float near, float far, float fov, float aspect)
 {
     float angle = fov / 180.0 * PI;
     Matrix P2O = Matrix::identity();
@@ -61,9 +59,9 @@ Matrix Render::getProjection(float near, float far, float fov, float aspect)
     T[0][3] = -(left + right) / 2.f;
     T[1][3] = -(top + bottom) / 2.f;
     T[2][3] = -(near + far) / 2.f;
-    return O * T * P2O;
+    Projection = O * T * P2O;
 }
-Matrix Render::getViewport(int width, int height)
+void getViewport(int width, int height)
 {
     Matrix vp = Matrix::identity();
     vp[0][0] = width / 2.f;
@@ -72,7 +70,7 @@ Matrix Render::getViewport(int width, int height)
     vp[1][3] = height / 2.f;
     vp[2][3] = 255.f / 2.f;
     vp[2][2] = 255.f / 2.f;
-    return vp;
+    Viewport = vp;
 }
 
 Render::Render(int width, int height, IShader *shader, MSAA msaa)
@@ -108,49 +106,53 @@ static Vec3f barycentric(Vec2f A, Vec2f B, Vec2f C, Vec2f P)
         return Vec3f((1.f - (UV.x + UV.y) / UV.z), UV.x / UV.z, UV.y / UV.z);
     return Vec3f(1, 1, -1);
 }
-void Render::triangle(Vec4f *pts)
+void Render::triangle(mat<4, 3, float> &clipc)
 {
-    // 包围盒
-    Vec2f bbomin(std::numeric_limits<float>::max(), std::numeric_limits<float>::max());
-    Vec2f bbomax(-std::numeric_limits<float>::max(), -std::numeric_limits<float>::max());
-    Vec2f clamp(width - 1, height - 1);
+    mat<3, 4, float> pts = (Viewport * clipc).transpose(); // transposed to ease access to each of the points
+    mat<3, 2, float> pts2;
+    for (int i = 0; i < 3; i++)
+        pts2[i] = proj<2>(pts[i] / pts[i][3]);
+
+    Vec2f bboxmin(std::numeric_limits<float>::max(), std::numeric_limits<float>::max());
+    Vec2f bboxmax(-std::numeric_limits<float>::max(), -std::numeric_limits<float>::max());
+    Vec2f clamp(image->get_width() - 1, image->get_height() - 1);
     for (int i = 0; i < 3; i++)
     {
         for (int j = 0; j < 2; j++)
         {
-            pts[i][j] = int(pts[i][j] + .5);
-
-            bbomin[j] = std::max(0.f, std::min(bbomin[j], pts[i][j] / pts[i][3]));
-            bbomax[j] = std::min(clamp[j], std::max(bbomax[j], pts[i][j] / pts[i][3]));
+            bboxmin[j] = std::max(0.f, std::min(bboxmin[j], pts2[i][j]));
+            bboxmax[j] = std::min(clamp[j], std::max(bboxmax[j], pts2[i][j]));
         }
     }
-    Vec3f P;
+    Vec2i P;
     TGAColor color(0, 0, 0, 255), rColor(0, 0, 0, 255);
-    for (P.x = int(bbomin.x); P.x <= int(bbomax.x + .5); P.x++)
+    for (P.x = int(bboxmin.x); P.x <= int(bboxmax.x + .5); P.x++)
     {
-        for (P.y = int(bbomin.y); P.y <= int(bbomax.y + .5); P.y++)
+        for (P.y = int(bboxmin.y); P.y <= int(bboxmax.y + .5); P.y++)
         {
             for (int i = 0; i < msaa; i++)
             {
                 for (int j = 0; j < msaa; j++)
                 {
                     color = {0, 0, 0, 255};
-                    Vec3f p;
+                    Vec2i p;
                     p.x = P.x + 1.f / msaa * i + 1.f / msaa / 2.f, p.y = P.y + 1.f / msaa * j + 1.f / msaa / 2.f;
                     Vec3f bc_screen = barycentric(proj<2>(pts[0] / pts[0][3]), proj<2>(pts[1] / pts[1][3]), proj<2>(pts[2] / pts[2][3]), proj<2>(p));
+                    Vec3f bc_clip = Vec3f(bc_screen.x / pts[0][3], bc_screen.y / pts[1][3], bc_screen.z / pts[2][3]);
+                    bc_clip = bc_clip / (bc_clip.x + bc_clip.y + bc_clip.z);
                     if (bc_screen.x < 0 || bc_screen.y < 0 || bc_screen.z < 0)
                         continue;
-                    p.z = 0;
+                    float frag_depth = 0;
                     for (int k = 0; k < 3; k++)
-                        p.z += pts[k][2] / pts[k][3] * bc_screen[k];
+                        frag_depth += clipc[2][k] / clipc[3][k] * bc_clip[k];
                     int idx = getSuperIndex(int(P.x * msaa + i), int(P.y * msaa + j));
-                    if (superZbuffer[idx] < p.z)
+                    if (superZbuffer[idx] < frag_depth)
                     {
 
-                        bool discard = shader->fragment(bc_screen, color);
+                        bool discard = shader->fragment(bc_clip, color);
                         if (!discard)
                         {
-                            superZbuffer[idx] = p.z;
+                            superZbuffer[idx] = frag_depth;
                             superImage->set(P.x * msaa + i, P.y * msaa + j, color);
                             rColor = {0, 0, 0, 255};
                             for (int ii = 0; ii < msaa; ii++)

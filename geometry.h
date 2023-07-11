@@ -4,9 +4,7 @@
 #include <vector>
 #include <cassert>
 #include <iostream>
-
 const double PI = acos(-1);
-
 template <size_t DimCols, size_t DimRows, typename T>
 class mat;
 
@@ -108,6 +106,14 @@ template <size_t DIM, typename T>
 vec<DIM, T> operator-(vec<DIM, T> lhs, const vec<DIM, T> &rhs)
 {
     for (size_t i = DIM; i--; lhs[i] -= rhs[i])
+        ;
+    return lhs;
+}
+
+template <size_t DIM, typename T>
+vec<DIM, T> operator-(vec<DIM, T> lhs)
+{
+    for (size_t i = DIM; i--; lhs[i] = -lhs[i])
         ;
     return lhs;
 }
@@ -265,6 +271,19 @@ public:
         mat<DimRows, DimCols, T> ret = adjugate();
         T tmp = ret[0] * rows[0];
         return ret / tmp;
+    }
+
+    mat<DimRows, DimCols, T> invert()
+    {
+        return invert_transpose().transpose();
+    }
+
+    mat<DimCols, DimRows, T> transpose()
+    {
+        mat<DimCols, DimRows, T> ret;
+        for (size_t i = DimCols; i--; ret[i] = this->col(i))
+            ;
+        return ret;
     }
 };
 

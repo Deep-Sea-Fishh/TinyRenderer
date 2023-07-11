@@ -4,6 +4,13 @@
 #include "geometry.h"
 #include "tgaimage.h"
 
+extern Matrix ModelView;
+extern Matrix Projection;
+extern Matrix Viewport;
+
+void getView(Vec3f pos, Vec3f center, Vec3f up);
+void getProjection(float near, float far, float fov, float aspect);
+void getViewport(int width, int height);
 struct IShader
 {
     virtual ~IShader();
@@ -32,16 +39,11 @@ private:
 public:
     Render(int width, int height, IShader *shader, MSAA msaa);
     ~Render();
-    void triangle(Vec4f *pts);
+    void triangle(mat<4, 3, float> &clipc);
     int getWidth();
     int getHeight();
     int getIndex(int x, int y) { return y * width + x; }
     int getSuperIndex(int x, int y) { return y * width * msaa + x; }
-
-    static Matrix getModel(Vec3f scale);
-    static Matrix getView(Vec3f pos, Vec3f center, Vec3f up);
-    static Matrix getProjection(float near, float far, float fov, float aspect);
-    static Matrix getViewport(int width, int height);
 
     TGAImage *getImage() { return image; }
     TGAImage *getSuperImage() { return superImage; }
