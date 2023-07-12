@@ -19,4 +19,4 @@ public:
     TGAColor uv(float u, float v);
 };
 
-#endif //__TEXTURE_H__
+#endif

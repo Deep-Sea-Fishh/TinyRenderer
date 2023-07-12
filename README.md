@@ -208,8 +208,6 @@ void triangle(Vec2i *t, TGAImage &image, TGAColor color)
 }
 ```
 
-
-
 ##### 方法2：重心坐标
 
 在重心坐标下，一个点P如果在三角形内部，则有P=uA+vB+wC，其中，$0\le u,v,w\le 1$且$u+v+w==1$。
@@ -639,3 +637,6 @@ M_{viewport}=
 0&0&0&1\\
 \end{bmatrix}
 $$
+
+## 法线贴图
+

@@ -13,17 +13,17 @@ const int height = 800;
 Model *model = nullptr;
 Vec3f light_dir(1, 1, 1);
 
-const Vec3f cameraPos(1, 1, 3);
+const Vec3f cameraPos(1, 0.8, 3);
 const Vec3f cameraCenter(0, 0, 0);
 const Vec3f cameraUp(0, 1, 0);
 
 int cnt = 0;
 struct Shader : public IShader
 {
-    mat<2, 3, float> varying_uv;  // triangle uv coordinates, written by the vertex shader, read by the fragment shader
-    mat<4, 3, float> varying_tri; // triangle coordinates (clip coordinates), written by VS, read by FS
-    mat<3, 3, float> varying_nrm; // normal per vertex to be interpolated by FS
-    mat<3, 3, float> ndc_tri;     // triangle in normalized device coordinates
+    mat<2, 3, float> varying_uv;
+    mat<4, 3, float> varying_tri;
+    mat<3, 3, float> varying_nrm;
+    mat<3, 3, float> ndc_tri;
 
     virtual Vec4f vertex(int iface, int nthvert)
     {
@@ -74,14 +74,14 @@ struct Shader : public IShader
 };
 struct PhongShader : public IShader
 {
-    mat<3, 3, float> varying_nrm; // normal per vertex to be interpolated by FS
-    mat<2, 3, float> varying_uv;  // triangle uv coordinates, written by the vertex shader, read by the fragment shader
-    mat<3, 3, float> ndc_tri;     // triangle in normalized device coordinates
+    mat<3, 3, float> varying_nrm;
+    mat<2, 3, float> varying_uv;
+    mat<3, 3, float> ndc_tri;
     mat<4, 3, float> varying_tri;
     virtual Vec4f vertex(int iface, int nthvert)
     {
-        Vec4f gl_Vertex = embed<4>(model->vert(iface, nthvert)); // read the vertex from .obj file
-        gl_Vertex = Projection * ModelView * gl_Vertex;          // transform it to screen coordinates
+        Vec4f gl_Vertex = embed<4>(model->vert(iface, nthvert));
+        gl_Vertex = Projection * ModelView * gl_Vertex;
         varying_uv.set_col(nthvert, model->uv(iface, nthvert));
         varying_nrm.set_col(nthvert, proj<3>((Projection * ModelView).invert_transpose() * embed<4>(model->normal(iface, nthvert), 0.f)));
         ndc_tri.set_col(nthvert, proj<3>(gl_Vertex / gl_Vertex[3]));
@@ -114,7 +114,7 @@ struct PhongShader : public IShader
         float intensity = n * light_dir;
 
         color = model->diff(uv) * intensity;
-        return false; // no, we do not discard this pixel
+        return false;
     }
 };
 int main(int argc, char **argv)
@@ -154,7 +154,6 @@ int main(int argc, char **argv)
             render->triangle(shader.varying_tri);
         }
     }
-    std::cout << cnt << std::endl;
     render->getImage()->flip_vertically();
     render->getImage()->write_tga_file("TBN.tga");
     while (models.size())

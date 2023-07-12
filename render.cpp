@@ -108,7 +108,7 @@ static Vec3f barycentric(Vec2f A, Vec2f B, Vec2f C, Vec2f P)
 }
 void Render::triangle(mat<4, 3, float> &clipc)
 {
-    mat<3, 4, float> pts = (Viewport * clipc).transpose(); // transposed to ease access to each of the points
+    mat<3, 4, float> pts = (Viewport * clipc).transpose();
     mat<3, 2, float> pts2;
     for (int i = 0; i < 3; i++)
         pts2[i] = proj<2>(pts[i] / pts[i][3]);
